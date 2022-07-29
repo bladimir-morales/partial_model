@@ -1,0 +1,307 @@
+---
+title: "Modelos con Coeficientes Variando"
+header-includes:
+  - \usepackage{titling}
+  - \pretitle{\begin{center}
+    \includegraphics[width=3in,height=3in]{logo2.png}\LARGE\\}
+  - \posttitle{\end{center}}
+author: "Bladimir Morales Torrez"
+date: "Julio 2022"
+output: 
+  pdf_document:
+    number_sections: true
+    toc: true
+bibliography: bibliografia.bib
+csl: apa.csl
+link-citations: true
+editor_options: 
+  chunk_output_type: console
+---
+
+\newcommand{\wn}{{\bf w}}
+\newcommand{\In}{{\bf I}}
+\newcommand{\Wn}{{\bf W}}
+\newcommand{\Nn}{{\bf N}}
+\newcommand{\yn}{{\bf y}}
+\newcommand{\zn}{{\bf z}}
+\newcommand{\Yn}{{\bf Y}}
+\newcommand{\Xn}{{\bf X}}
+\newcommand{\Kn}{{\bf K}}
+\newcommand{\Qn}{{\bf Q}}
+\newcommand{\Rn}{{\bf R}}
+\newcommand{\ymn}{{\bf y}}
+\newcommand{\Un}{{\bf U}}
+\newcommand{\Hn}{{\bf H}}
+\newcommand{\Bn}{{\bf B}}
+\newcommand{\Ln}{{\bf L}}
+
+
+\def \x {\mathop{\rm x}\nolimits}
+\def \y {\mathop{\rm y}\nolimits}
+\def \t {\mathop{\rm t}\nolimits}
+\def \diag {\mathop{\rm diag}\nolimits}
+
+\newcommand{\tetn}{{\mbox{\boldmath $\theta$}}}
+\newcommand{\betan}{{\mbox{\boldmath $\beta$}}}
+\newcommand{\omegan}{{\mbox{\boldmath $\omega$}}}
+\newcommand{\varepsilonn}{{\mbox{\boldmath $\varepsilon$}}}
+
+\def\R{{\rm I\! R}}
+\def\E{{\rm I\! E}}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(tidyverse)
+library(moments)
+```
+\newpage
+
+# Datos
+
+El conjunto de datos es `Caschool` del paquete `Ecdat`. Este conjunto de datos contiene $420$ observaciones transversales recogidas durante el año escolar $1998-1999$ en los distritos escolares de California. 
+
+Las variables a ser utilizadas son:
+`mathscr`: puntuaciones medias de matemáticas (variable de respuesta)   
+las siguientes cuatro serán las covariables:  
+`calwpct`: porcentaje de niños que cumplen los requisitos para recibir CalWORKs,  
+`log.avginc`: logaritmo natural de la renta media del distrito,  
+`compstu`: número de computadoras por alumno,  
+`expnstu`: gasto por alumno  
+
+CalWORKs es un *programa de asistencia social que ofrece ayuda en efectivo y servicios a las familias necesitadas de California que reúnen los requisitos*. 
+
+Primero se realizará un análisis descriptivo de las variables en estudio, luego se estimará un modelo de regresión lineal, un modelo no paramétrico y un modelo parcial, para encontrar el modelo que mejor ajuste tenga, para luego realizar el diagnóstico del modelo, se realizará posteriormente la predicción de datos para que finalmente detallar las conclusiones.
+
+# Análisis exploratorio
+
+```{r echo=FALSE}
+library(mgcv);library(Ecdat);data(Caschool)
+Caschool$log.avginc <- log(Caschool$avginc)
+
+bd<-Caschool %>% dplyr::select(mathscr,calwpct,log.avginc,compstu,expnstu)
+attach(bd)
+```
+
+Primero se visualizará el comportamiento de la variable de respuesta `mathscr` (puntuaciones medias de matemáticas):
+
+```{r}
+hist(mathscr,main = "Histograma de mathscr",freq = FALSE,breaks = 20)
+```
+
+Sus estadísticos son los siguientes:
+
+```{r}
+bd %>% 
+  summarise(obs=n(),
+            media=mean(mathscr),
+            sd=sd(mathscr),
+            asimetria=skewness(mathscr),
+            curtosis=kurtosis(mathscr),
+            min=min(mathscr),
+            max=max(mathscr),
+            mediana=median(mathscr))
+```
+
+Se tendría una distribución aparentemente simétrica positiva (asimetría=0.25) y platicúrtica (Curtosis<3).
+
+Ahora vemos las correlaciones de las variables en estudio .
+
+```{r}
+cor(bd)
+```
+
+Las correlaciones más altas con la variable `mathscr` son las de `calwpct` y `log.avginc`. En el siguiente gráfico se observa visualmente las relaciones entre variables con una curva suavizada.
+
+```{r}
+pairs(bd,panel = function(x,y){
+  points(x,y)
+  lines(lowess(x,y),lwd=2,col="red")
+  })
+```
+La variable `calwpct`, `compstu` y `expnstu` al parecer tienen una relación no lineal con la variable de respuesta, mientras que `log.avginc` podría tener una tendencia lineal.
+
+# Modelos
+
+```{r}
+modlin <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu+ expnstu)
+summary(modlin)
+```
+
+```{r}
+modlin <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu)
+summary(modlin)
+```
+
+
+```{r}
+modnopara <- mgcv::gam(mathscr ~ s(calwpct)+s(log.avginc)+s(compstu)+ s(expnstu))
+summary(modnopara)
+```
+
+```{r}
+modnopara <- mgcv::gam(mathscr ~ s(calwpct)+s(log.avginc)+s(compstu))
+summary(modnopara)
+```
+
+
+
+```{r}
+modparcial <- mgcv::gam(mathscr ~ s(calwpct)+log.avginc+s(compstu)+ s(expnstu))
+summary(modparcial)
+```
+
+```{r}
+modparcial <- mgcv::gam(mathscr ~ s(calwpct)+log.avginc+s(compstu))
+summary(modparcial)
+```
+
+```{r}
+library(visreg)
+par(mfrow=c(1,3))
+visreg(modlin)
+dev.off()
+```
+
+
+```{r}
+par(mfrow=c(1,3))
+visreg(modnopara)
+dev.off()
+```
+
+
+```{r}
+par(mfrow=c(1,3))
+visreg(modparcial)
+dev.off()
+```
+
+
+# Criterio de Información de Akaike
+
+```{r}
+modlin$aic
+modnopara$aic
+modparcial$aic
+```
+
+# Análisis de Devianza
+
+
+```{r}
+anova(modlin,modnopara,test = "F")
+```
+
+```{r}
+anova(modlin,modparcial,test = "F")
+```
+
+# Análisis de Diagnóstico
+
+## Puntos de apalancamiento 
+
+```{r}
+library(MASS)
+n=length(modlin$y)
+ri=modlin$residuals
+h=modlin$hat
+phi=modlin$sig2
+varr=(1-h)*phi
+tdf=ri/sqrt(varr)
+di=(h*(ri^2))/(((1-h)^2)*phi*sum(h))#Distancia de Cox
+a=max(tdf)
+b=min(tdf)
+cut=(2*sum(h))/n
+```
+
+```{r}
+#Para puntos de apalancamiento o leverange
+plot(h,xlab="Indice",ylab="Media h",main="Leverage",pch=16)
+abline(cut,0,lty=2)
+identify(h,n=5)
+```
+
+## Puntos influyentes
+
+```{r}
+# Gráfico de puntos influyentes
+plot(di,xlab="Indice",ylab="Distancia de Cox",main="Puntos Influyentes",pch=16)
+identify(di,n=5)
+```
+
+```{r}
+#Gráficos de Reisudos Estandarizados vs Indices
+plot(tdf,xlab="Indice",ylab = "Residuo estandarizado",main="Residuo estandarizado",pch=16)
+abline(2,0,lty=2,col="red")
+abline(-2,0,lty=2,col="red")
+```
+
+
+```{r}
+#Gráficos de Reisudos Estandarizados vs valores ajustados
+plot(modlin$fitted.values,tdf,xlab="Valor ajustado",main="Homocedasticidad",ylab="Residuo estandarizado",pch=16)
+abline(2,0,lty=2,col="red")
+abline(-2,0,lty=2,col="red")
+```
+
+# Análisis de residuos
+
+
+```{r echo=FALSE}
+library(PerformanceAnalytics)
+```
+
+```{r}
+par(mfrow=c(1,3))
+hist(modlin$residuals,freq = TRUE,main = "LM")
+hist(modnopara$residuals,freq = TRUE,main = "GAM")
+hist(modparcial$residuals,freq = TRUE,main = "PLM")
+
+```
+
+
+```{r}
+
+par(mfrow=c(1,3))
+chart.QQPlot(modlin$residuals,distribution = "norm",main = "LM")
+chart.QQPlot(modnopara$residuals,distribution = "norm",main = "GAM")
+chart.QQPlot(modparcial$residuals,distribution = "norm",main = "PLM")
+```
+
+
+
+```{r}
+par(mfrow=c(2,2))
+plot.gam(modnp)
+dev.off()
+```
+
+Vemos que `log.avginc` tiene el mayor efecto, ya que el promedio de mathscr aumenta
+de forma constante con este predictor. Además, calwpct tiene el siguiente efecto más importante y
+su efecto no es lineal, con un fuerte descenso inicial antes de estabilizarse. Es interesante,
+compstu y expnstu parecen tener poco o ningún efecto.
+Una cuestión que se plantea con frecuencia en el análisis práctico de datos es la adecuación de
+un modelo lineal. Para abordar esta cuestión, comenzamos ajustando un MLG utilizando el modelo gam()
+
+```{r}
+modl <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu+ expnstu)
+summary(modl)
+```
+
+```{r}
+anova(modl,modnp,test = "F")
+```
+
+El pequeño valor p es coherente con las relaciones no lineales observadas en la Fig. 3.1, y
+tanto el valor p como esta figura indican que se prefiere el GAM al GLM.
+Se podría considerar la posibilidad de eliminar la variable expnstu, ya que en la Fig. 3.1 parece
+tener poco o ningún efecto sobre mathscr. En la Secc. 3.4 elegimos los predictores de una manera más de principio y, efectivamente, hay pruebas de que expnstu tiene, como mucho, un pequeño efecto sobre
+
+
+
+# Análisis descriptivo
+
+## Variable de respuesta Crecimiento del PIB
+
+
