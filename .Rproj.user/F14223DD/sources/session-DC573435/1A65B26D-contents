@@ -1,20 +1,21 @@
 ---
-title: "Modelos con Coeficientes Variando"
+title: "Modelos Semiparamétricos"
+subtitle: " Magister en Matemáticas con Mención en Estadística"
 header-includes:
-  - \usepackage{titling}
-  - \pretitle{\begin{center}
-    \includegraphics[width=3in,height=3in]{logo2.png}\LARGE\\}
-  - \posttitle{\end{center}}
+- \usepackage{titling}
+- \pretitle{\begin{center}
+  \includegraphics[width=3in,height=3in]{logo2.png}\LARGE\\}
+- \posttitle{\end{center}}
 author: "Bladimir Morales Torrez"
 date: "Julio 2022"
-output: 
+output:
   pdf_document:
     number_sections: true
     toc: true
 bibliography: bibliografia.bib
 csl: apa.csl
 link-citations: true
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -51,34 +52,32 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(readxl)
 library(tidyverse)
 library(moments)
 ```
 \newpage
 
-# Datos
+# Datos e Información
 
-El conjunto de datos es `Caschool` del paquete `Ecdat`. Este conjunto de datos contiene $420$ observaciones transversales recogidas durante el año escolar $1998-1999$ en los distritos escolares de California. 
+El conjunto de datos es `Caschool` del paquete `Ecdat`. Este conjunto de datos contiene $420$ observaciones transversales recogidas durante el año escolar $1998-1999$ en los distritos escolares de California.
 
 Las variables a ser utilizadas son:
-`mathscr`: puntuaciones medias de matemáticas (variable de respuesta)   
-las siguientes cuatro serán las covariables:  
-`calwpct`: porcentaje de niños que cumplen los requisitos para recibir CalWORKs,  
-`log.avginc`: logaritmo natural de la renta media del distrito,  
-`compstu`: número de computadoras por alumno,  
-`expnstu`: gasto por alumno  
+  `mathscr`: puntuaciones medias de matemáticas (variable de respuesta)
+las siguientes cuatro serán las covariables:
+`calwpct`: porcentaje de niños que cumplen los requisitos para recibir CalWORKs,
+`log.avginc`: logaritmo natural de la renta media del distrito,
+`compstu`: número de computadoras por alumno,
+`expnstu`: gasto por alumno
 
-CalWORKs es un *programa de asistencia social que ofrece ayuda en efectivo y servicios a las familias necesitadas de California que reúnen los requisitos*. 
+CalWORKs es un *programa de asistencia social que ofrece ayuda en efectivo y servicios a las familias necesitadas de California que reúnen los requisitos*.
 
-Primero se realizará un análisis descriptivo de las variables en estudio, luego se estimará un modelo de regresión lineal, un modelo no paramétrico y un modelo parcial, para encontrar el modelo que mejor ajuste tenga, para luego realizar el diagnóstico del modelo, se realizará posteriormente la predicción de datos para que finalmente detallar las conclusiones.
+Primero se realizará un análisis exploratorio de las variables de estudio, luego se estimará un modelo de regresión lineal, un modelo no paramétrico y un modelo parcial y evaluar sus diferentes características para encontrar el modelo que mejor ajuste, para luego realizar el diagnóstico del modelo, la predicción de datos y detallar las conclusiones.
 
-# Análisis exploratorio
+## Análisis exploratorio
 
-```{r echo=FALSE}
+```{r echo=FALSE,warning=FALSE,message=FALSE}
 library(mgcv);library(Ecdat);data(Caschool)
 Caschool$log.avginc <- log(Caschool$avginc)
-
 bd<-Caschool %>% dplyr::select(mathscr,calwpct,log.avginc,compstu,expnstu)
 attach(bd)
 ```
@@ -92,7 +91,7 @@ hist(mathscr,main = "Histograma de mathscr",freq = FALSE,breaks = 20)
 Sus estadísticos son los siguientes:
 
 ```{r}
-bd %>% 
+bd %>%
   summarise(obs=n(),
             media=mean(mathscr),
             sd=sd(mathscr),
@@ -103,7 +102,7 @@ bd %>%
             mediana=median(mathscr))
 ```
 
-Se tendría una distribución aparentemente simétrica positiva (asimetría=0.25) y platicúrtica (Curtosis<3).
+Se presume tener una distribución simétrica con una leve tendencia hacia la positividad (asimetría=0.25) y platicúrtica (Curtosis<3).
 
 Ahora vemos las correlaciones de las variables en estudio .
 
@@ -117,96 +116,152 @@ Las correlaciones más altas con la variable `mathscr` son las de `calwpct` y `l
 pairs(bd,panel = function(x,y){
   points(x,y)
   lines(lowess(x,y),lwd=2,col="red")
-  })
+})
 ```
-La variable `calwpct`, `compstu` y `expnstu` al parecer tienen una relación no lineal con la variable de respuesta, mientras que `log.avginc` podría tener una tendencia lineal.
+La variable `calwpct`, `compstu` y `expnstu` al parecer tienen una relación no lineal con la variable de respuesta, mientras que `log.avginc` podría tener una relación lineal positiva.
 
 # Modelos
 
-```{r}
-modlin <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu+ expnstu)
-summary(modlin)
-```
+Se planteara tres diferentes modelos para esta sección:
+
+* Modelo lineal clásico LM
+* Modelo no paramétrico GAM
+* Modelo semiparamétrico o parcial PLM
+
+## Modelo Lineal LM
+
+Se utilizará el paquete `mgcv` para estimar el modelo lineal asumiendo que la distribución de los errores es Normal (Gaussiana) en nuestras variables de estudio. Es así que se tiene:
 
 ```{r}
-modlin <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu)
-summary(modlin)
+modlm <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu+ expnstu,family = gaussian)
+summary(modlm)
 ```
 
+Al ver la prueba $t$ las covariables `calwpct`, `log.avginc` y `compstu` son significativas para el modelo, vale decir que si aportan a explicar el modelo propuesto, mientras que `expnstu` no es significativo para el modelo. Se tiene un $R^2-ajust$ de $0.598$, un ajuste relativamente bueno para los datos presentados.
+
+Ahora se eliminará la covariable `expnstu` del modelo, teniendo:
 
 ```{r}
-modnopara <- mgcv::gam(mathscr ~ s(calwpct)+s(log.avginc)+s(compstu)+ s(expnstu))
-summary(modnopara)
+modlm <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu,family = gaussian)
+summary(modlm)
 ```
 
-```{r}
-modnopara <- mgcv::gam(mathscr ~ s(calwpct)+s(log.avginc)+s(compstu))
-summary(modnopara)
-```
+Ahora todas las covariables son significativas incluyendo el intercepto. Con el nuevo modelo se tiene un $R^2-ajust$ de $0.599$, un ajuste levemente mayor al anterior modelo.
 
-
-
-```{r}
-modparcial <- mgcv::gam(mathscr ~ s(calwpct)+log.avginc+s(compstu)+ s(expnstu))
-summary(modparcial)
-```
-
-```{r}
-modparcial <- mgcv::gam(mathscr ~ s(calwpct)+log.avginc+s(compstu))
-summary(modparcial)
-```
+En el siguiente gráfico se puede ver los valores ajustados estimados bajo el modelo propuesto.
 
 ```{r}
 library(visreg)
 par(mfrow=c(1,3))
-visreg(modlin)
+visreg(modlm)
 dev.off()
 ```
 
+
+## Modelo no Paramétrico GAM
+
+Ahora bajo el análisis exploratorio se pudo observar que existe una relación no lineal entre las covariables y la variable de respuesta excepto la `log.avginc`, pero por motivos prácticos asumiremos que todas las covariables no tienen relación lineal, es así que se estimará un modelo no paramétrico con errores gaussianos, con suavizamiento spline cúbico natural y el grado del polinomio se elegirá en base al método de validación cruzada generalizada.
+
+```{r}
+modgam <- mgcv::gam(mathscr ~ s(calwpct)+s(log.avginc)+s(compstu)+ s(expnstu),family = gaussian, method = "GCV.Cp")
+summary(modgam)
+```
+
+De la misma manera que el modelo lineal, la covariable `expnstu` bajo la función no paramétrica  no es significativa para el modelo, por tal motivo se excluira del modelo no paramétrico.
+
+```{r}
+modgam <- mgcv::gam(mathscr ~ s(calwpct)+s(log.avginc)+s(compstu),family = gaussian, method = "GCV.Cp")
+summary(modgam)
+```
+
+Ahora todas las covariables son significativas bajo funciones suaves no paramétricas y así también el intercepto. Con el nuevo modelo se tiene un $R^2-ajust$ de $0.637$, un ajuste bueno para los datos y una $Deviance$ de $64.6\%$.
+
+En el siguiente gráfico se puede ver los valores ajustados estimados bajo el modelo propuesto.
 
 ```{r}
 par(mfrow=c(1,3))
-visreg(modnopara)
+visreg(modgam)
 dev.off()
 ```
 
+Se puede observar que la covariable `log.avginc` bajo el modelo propuesto no presentaría una relación lineal.
+
+## Modelo Semiparamétrico o Parcial PLM
+
+Ahora se estimará un modelo parcial, ya que bajo el análisis exploratorio la covariable `log.avginc` presentaba aparentemente una relación lineal y las demás no lineales. Para el componente no paramétrico se asumira errores con distribución gaussiana, suavizamiento spline cúbico natural y el grado del polinomio se ajustará mediante validación cruzada generalizada. Bajo esa descripción se ajustara el siguiente modelo:
+
+```{r}
+modplm <- mgcv::gam(mathscr ~ log.avginc+s(calwpct)+s(compstu)+ s(expnstu),family = gaussian,method = "GCV.Cp")
+summary(modplm)
+```
+
+El componente paramétrico es significativo para el modelo y también el intercepto. En el componente no paramétrico al igual que los anteriores modelos la covariable `expnstu` es no significativa, es así que se excluira la misma para proponer el siguiente modelo parcial:
+
+```{r}
+modplm <- mgcv::gam(mathscr ~ log.avginc+s(calwpct)+s(compstu),family = gaussian,method = "GCV.Cp")
+summary(modplm)
+```
+
+Ahora todas las covariables del componente no paramétrico son significativas bajo funciones suaves y así también el componente paramétrico y el intercepto. Con el nuevo modelo se tiene un $R^2-ajust$ de $0.629$, un ajuste bueno para los datos y una $Deviance$ de $63.8\%$.
+
+En el siguiente gráfico se puede ver los valores ajustados estimados bajo el modelo propuesto.
 
 ```{r}
 par(mfrow=c(1,3))
-visreg(modparcial)
+visreg(modplm)
 dev.off()
 ```
+Se muestra claramente las covariables que están siendo ajustadas por el componente paramétrico (lineal) y no paramétrico (funciones suaves).
 
+# Selección del modelo
 
-# Criterio de Información de Akaike
+## Primer criterio
 
-```{r}
-modlin$aic
-modnopara$aic
-modparcial$aic
-```
+Para evaluar qué modelo se esta ajustando mejor a los datos una opción es utilizar el $R^2-ajust$ o la $Deviance$. Bajo este criterio de los tres modelos presentados el mayor $R^2-ajust$ y $Deviance$ es el modelo no paramétrico con $0.637$ y $64.6\%$.
 
-# Análisis de Devianza
+## Criterio de Información de Akaike
 
-
-```{r}
-anova(modlin,modnopara,test = "F")
-```
+Se presenta el AIC de los tres modelos propuestos:
 
 ```{r}
-anova(modlin,modparcial,test = "F")
+modlm$aic
+modgam$aic
+modplm$aic
 ```
+
+Bajo el AIC el modelo que presenta el menor número es el modelo no paramétrico con $3243.069$.
+
+## Prueba F
+
+La prueba $F$ es otro criterio de comparación de deviance para ver si el modelo propuesto es el que presenta más ajuste. Es así que, primero se evaluará el modelo lineal clásico con el modelo no paramétrico.
+
+```{r}
+anova(modlm,modgam,test = "F")
+```
+
+Como se puede ver sale que el modelo propuesto es significativo, vale decir que el modelo no paramétrico presenta mejor ajuste que el modelo lineal clásico. De la misma manera se compara el modelo lineal clásico con el modelo parcial.
+
+```{r}
+anova(modlm,modplm,test = "F")
+```
+
+Se puede observar que el modelo parcial presenta mejor ajuste que el nodelo lineal bajo este tipo de pruebas.
+
+## Conclusión
+
+Como se pudo observar el modelo que presenta mejor ajuste a los datos es un modelo no paramétrico con suavizadores spline cúbico natural, teniendo en cuenta que es el que presenta mayor $R^2-ajust$, $Deviance$, menor $AIC$ y bajo la prueba $F$ es significativo.
 
 # Análisis de Diagnóstico
 
-## Puntos de apalancamiento 
+## Puntos de apalancamiento
+
+Bajo el modelo no paramétrico que presenta mejor ajuste a los datos, se tiene, el análisis de apalancamiento (leverage).
 
 ```{r}
-library(MASS)
-n=length(modlin$y)
-ri=modlin$residuals
-h=modlin$hat
-phi=modlin$sig2
+n=length(modgam$y)
+ri=modgam$residuals
+h=modgam$hat
+phi=modgam$sig2
 varr=(1-h)*phi
 tdf=ri/sqrt(varr)
 di=(h*(ri^2))/(((1-h)^2)*phi*sum(h))#Distancia de Cox
@@ -216,92 +271,88 @@ cut=(2*sum(h))/n
 ```
 
 ```{r}
-#Para puntos de apalancamiento o leverange
 plot(h,xlab="Indice",ylab="Media h",main="Leverage",pch=16)
-abline(cut,0,lty=2)
-identify(h,n=5)
+abline(cut,0,lty=2,col="red")
 ```
+
+Si presenta puntos de apalancamiento.
 
 ## Puntos influyentes
 
 ```{r}
-# Gráfico de puntos influyentes
 plot(di,xlab="Indice",ylab="Distancia de Cox",main="Puntos Influyentes",pch=16)
-identify(di,n=5)
 ```
+De la misma manera existen puntos u observaciones influyentes para el modelo.
 
-```{r}
-#Gráficos de Reisudos Estandarizados vs Indices
-plot(tdf,xlab="Indice",ylab = "Residuo estandarizado",main="Residuo estandarizado",pch=16)
-abline(2,0,lty=2,col="red")
-abline(-2,0,lty=2,col="red")
-```
-
-
-```{r}
-#Gráficos de Reisudos Estandarizados vs valores ajustados
-plot(modlin$fitted.values,tdf,xlab="Valor ajustado",main="Homocedasticidad",ylab="Residuo estandarizado",pch=16)
-abline(2,0,lty=2,col="red")
-abline(-2,0,lty=2,col="red")
-```
 
 # Análisis de residuos
 
+Se realizará el análisis de residuos para verificar los supuestos de normalidad, para este cometido se utilizarán los residuos obtenidos por la regresión no paramétrica y así también los estandarizados.
+
+## Supuesto de normalidad
+
+Se grafica el histograma de los residuos de la regresión no paramétrica y los estandarizados, se observa que posiblemente tengan un comportamiento con distribución normal.
+
+```{r }
+#Normalidad
+par(mfrow=c(1,2))
+hist(ri,main="Histograma de Residuos",freq = FALSE,breaks = 30)
+hist(tdf,main="Histograma de Residuos Estandarizados",freq = FALSE,breaks = 30)
+```
+
+También se puede mostrar que existen datos atípicos en la cola izquierda en ambos histogramas.
+
+Se grafica el qq-plot, donde se puede observar que el diagrama es casi lineal lo cual muestra un posible comportamiento normal 
 
 ```{r echo=FALSE}
 library(PerformanceAnalytics)
 ```
 
 ```{r}
-par(mfrow=c(1,3))
-hist(modlin$residuals,freq = TRUE,main = "LM")
-hist(modnopara$residuals,freq = TRUE,main = "GAM")
-hist(modparcial$residuals,freq = TRUE,main = "PLM")
-
+par(mfrow=c(1,2))
+chart.QQPlot(ri,distribution = "norm",main = "QQ-Plot Residuos")
+chart.QQPlot(tdf,distribution = "norm",main = "QQ-Plot Residuos Estandarizados")
 ```
 
+Para tener evidencia estadística se realizará la dócima de Jarque-Bera para modelos de regresión.
+
+$$H_0:\text{residuos son normales}$$
 
 ```{r}
-
-par(mfrow=c(1,3))
-chart.QQPlot(modlin$residuals,distribution = "norm",main = "LM")
-chart.QQPlot(modnopara$residuals,distribution = "norm",main = "GAM")
-chart.QQPlot(modparcial$residuals,distribution = "norm",main = "PLM")
+library(normtest)
+jb.norm.test(ri)
+jb.norm.test(tdf)
 ```
 
+Tanto para los residuos de la regresión no paramétrica como los estandarizados el p-valor es mayor a $0.05$ teniendo evidencia estadística para no rechazar $H_0$, así los residuos son normales.
 
+## Supuesto de homocedasticidad
+
+Primero se hará un análisis gráfico de los residuos estandarizados con los indices y luego con los valores ajustados:
 
 ```{r}
-par(mfrow=c(2,2))
-plot.gam(modnp)
-dev.off()
+#Gráficos de Reisudos Estandarizados vs valores ajustados
+plot(modgam$fitted.values,tdf,xlab="Valor ajustado",main="Res. estandarizado vs Ajustados",ylab="Residuo estandarizado",pch=16)
+abline(2,0,lty=2,col="red")
+abline(-2,0,lty=2,col="red")
 ```
 
-Vemos que `log.avginc` tiene el mayor efecto, ya que el promedio de mathscr aumenta
-de forma constante con este predictor. Además, calwpct tiene el siguiente efecto más importante y
-su efecto no es lineal, con un fuerte descenso inicial antes de estabilizarse. Es interesante,
-compstu y expnstu parecen tener poco o ningún efecto.
-Una cuestión que se plantea con frecuencia en el análisis práctico de datos es la adecuación de
-un modelo lineal. Para abordar esta cuestión, comenzamos ajustando un MLG utilizando el modelo gam()
+Como se puede ver existen algunos puntos que salen de las bandas, lo cual concluiria que posiblemente los residuos sean heterocedasticos.
+
+## Supuesto de autocorrelación
+
+Se gráfica los residuos estandarizados, los cuales siguen un patron lineal lo cual podria concluir que estamos bajo errores autocorrelacionados.
 
 ```{r}
-modl <- mgcv::gam(mathscr ~ calwpct +log.avginc+compstu+ expnstu)
-summary(modl)
+#Gráficos de Reisudos Estandarizados vs Indices
+plot(tdf,xlab="Indice",ylab = "Res. estandarizado vs Indices",main="Residuo estandarizado",pch=16)
 ```
 
-```{r}
-anova(modl,modnp,test = "F")
-```
 
-El pequeño valor p es coherente con las relaciones no lineales observadas en la Fig. 3.1, y
-tanto el valor p como esta figura indican que se prefiere el GAM al GLM.
-Se podría considerar la posibilidad de eliminar la variable expnstu, ya que en la Fig. 3.1 parece
-tener poco o ningún efecto sobre mathscr. En la Secc. 3.4 elegimos los predictores de una manera más de principio y, efectivamente, hay pruebas de que expnstu tiene, como mucho, un pequeño efecto sobre
+# Conclusión
 
+Se pudo evaluar tres tipos de modelos el lineal clásico, no paramétrico y el parcial donde se pudo evidenciar que la covariable `expnstu` es no significativa tomando la decisión de eliminar la misma ya que no aporta a la explicación del modelo. Por otro lado se comparo los tres tipos de modelos resultando el mejor el modelo de regresión no paramétrico bajo los criterios de $R^2-ajust$, $Deviance$, $AIC$ y prueba $F$.
 
-
-# Análisis descriptivo
-
-## Variable de respuesta Crecimiento del PIB
+En el análisis de diagnóstico mediante puntos de apalancamiento e influyentes globales se determino que existen puntos que influyen bastante al modelo y en el análisis de residuos se pudo verificar el supuesto de normalidad, pero no así el de homocedasticidad y autocorrelación.
 
 
